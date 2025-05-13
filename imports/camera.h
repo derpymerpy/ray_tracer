@@ -46,39 +46,33 @@ class camera{
         }
 
         bool set_camera_center(point3 camera_center_loc, point3 image_center_loc, vec3 up_dir){
-            vec3 view_angle_temp = unit_vector(image_center_loc - camera_center_loc);
-            if (cross(view_angle_temp, up_dir).length_squared() == 0) {
+            vec3 w_temp = unit_vector(image_center_loc - camera_center_loc);
+            if (cross(w_temp, up_dir).length_squared() == 0) {
                 //invalid up 
                 return false;
             }
             camera_center = camera_center_loc;
-            view_angle = view_angle_temp;
+            unit_w = w_temp;
 
-            vec3 up_proj = view_angle * dot(up_dir, view_angle)/view_angle.length_squared();
-            up = unit_vector(up_dir - up_proj);
+            vec3 up_proj = unit_w * dot(up_dir, unit_w);
+            unit_v = unit_vector(up_dir - up_proj);
 
             return true;
         }
 
     private: 
-        int image_height;
-        double viewport_h; //height of viewport
-        double viewport_w; //width of viewport
+        int image_height; //in pixels/rows
 
         point3 camera_center = point3(0, 0, 0);
-        vec3 view_angle = point3(0, 0, -1); // unit vector in the direction the camera is pointing
-        vec3 up = vec3(0, 1, 0); // the "up" of the frame (orientation)
-        
-        //vectors along viewport 
-        vec3 viewport_u;
-        vec3 viewport_v;
 
         //vectors to move between pixels
         vec3 d_u;
         vec3 d_v;
 
         //unit direction vectors 
-        vec3 unit_u, unit_v;
+        vec3 unit_u;
+        vec3 unit_v = vec3(0, 1, 0);
+        vec3 unit_w = vec3(0, 0, -1);
 
         //first pixel
         point3 pixel00_loc;
@@ -93,20 +87,23 @@ class camera{
             image_height = image_height > 1 ? image_height : 1;
 
             double vfov_rad = degrees_to_radians(vfov);
-            viewport_h = focus_distance * 2 * std::tan(vfov_rad/2);
-            viewport_w = viewport_h * ((double)(image_width)/image_height);
 
-            viewport_u = viewport_w * cross(view_angle, up); //right 
-            viewport_v = viewport_h * -1 * up; //down 
-            
-            unit_u = unit_vector(viewport_u);
-            unit_v = unit_vector(viewport_v);
+            //viewport placed at focus plane 
+            double viewport_height = focus_distance * 2 * std::tan(vfov_rad/2);
+            double viewport_width = viewport_height * ((double)(image_width)/image_height);
 
+            //setting unit vectors. v and w are set by set_camera_center
+            unit_u = cross(unit_w, unit_v);
+
+            vec3 viewport_u = viewport_width * unit_u; //right 
+            vec3 viewport_v = viewport_height * -1 * unit_v; //down 
+
+            //vectors to move between pixels
             d_u = viewport_u / image_width;
             d_v = viewport_v / image_height;
 
             //upper left corner of viewport 
-            point3 viewport_ul = camera_center + focus_distance * view_angle - viewport_u/2 - viewport_v/2;
+            point3 viewport_ul = camera_center + focus_distance * unit_w - viewport_u/2 - viewport_v/2;
             pixel00_loc = viewport_ul + (d_u + d_v)/2;
             
             //basis vectors for defocus offset
@@ -157,7 +154,7 @@ class camera{
             vec3 ray_direction = pixel_center 
                                  + offset.x() * d_u 
                                  + offset.y() * d_v
-                                 - camera_center;
+                                 - ray_origin;
             ray r(ray_origin, ray_direction);
             return r;
         }

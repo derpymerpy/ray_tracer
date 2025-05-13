@@ -17,7 +17,7 @@ inline double degrees_to_radians(double degrees) {
     return degrees*pi/180;
 }
 
-inline double radius_to_degrees(double rad) {
+inline double radians_to_degrees(double rad) {
     return rad*180/pi;
 }
 
