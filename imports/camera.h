@@ -14,7 +14,8 @@ class camera{
         int samples_per_pixel = 10;
         int max_depth = 10;
 
-        double focal_length = 1.0;
+        double defocus_angle = 0.0; //angle at apex of defocus cone. controls radius of defocus disk
+        double focus_distance = 10.0; //distance from camera center to focus plane
 
         //vertical field of view
         double vfov = 90;
@@ -55,7 +56,6 @@ class camera{
 
             vec3 up_proj = view_angle * dot(up_dir, view_angle)/view_angle.length_squared();
             up = unit_vector(up_dir - up_proj);
-            focal_length = (camera_center_loc - image_center_loc).length();
 
             return true;
         }
@@ -77,10 +77,14 @@ class camera{
         vec3 d_u;
         vec3 d_v;
 
-        //upper left corner
-        point3 viewport_ul;
+        //unit direction vectors 
+        vec3 unit_u, unit_v;
+
         //first pixel
         point3 pixel00_loc;
+
+        vec3 defocus_disk_u;
+        vec3 defocus_disk_v;
 
 
         void initialize() {
@@ -89,17 +93,26 @@ class camera{
             image_height = image_height > 1 ? image_height : 1;
 
             double vfov_rad = degrees_to_radians(vfov);
-            viewport_h = focal_length * 2 * std::tan(vfov_rad/2);
+            viewport_h = focus_distance * 2 * std::tan(vfov_rad/2);
             viewport_w = viewport_h * ((double)(image_width)/image_height);
 
             viewport_u = viewport_w * cross(view_angle, up); //right 
             viewport_v = viewport_h * -1 * up; //down 
+            
+            unit_u = unit_vector(viewport_u);
+            unit_v = unit_vector(viewport_v);
 
             d_u = viewport_u / image_width;
             d_v = viewport_v / image_height;
 
-            viewport_ul = camera_center + focal_length * view_angle - viewport_u/2 - viewport_v/2;
+            //upper left corner of viewport 
+            point3 viewport_ul = camera_center + focus_distance * view_angle - viewport_u/2 - viewport_v/2;
             pixel00_loc = viewport_ul + (d_u + d_v)/2;
+            
+            //basis vectors for defocus offset
+            double defocus_radius = focus_distance * std::tan(degrees_to_radians(defocus_angle/2));
+            defocus_disk_u = unit_u * defocus_radius;
+            defocus_disk_v = unit_v * defocus_radius;
         }
 
         color ray_color(const ray& r, const hittable& world, int depth){
@@ -128,13 +141,24 @@ class camera{
             return vec3(random_double(-s/2, s/2), random_double(-s/2, s/2), 0);
         }
 
+        vec3 defocus_disk_offset() const{
+            if (defocus_angle > 0){
+                vec3 offset = random_in_unit_disk();    
+                //use u, v as unit direction vectors
+                return camera_center + (offset.x() * defocus_disk_u) + (offset.y() * defocus_disk_v);
+            }
+            return camera_center;
+        }
+
         ray get_sample_ray(point3 pixel_center, double s) const {
             vec3 offset = pixel_sample_offset(s);
+            point3 ray_origin = defocus_disk_offset();
+            //offset for antialiasing
             vec3 ray_direction = pixel_center 
                                  + offset.x() * d_u 
                                  + offset.y() * d_v
                                  - camera_center;
-            ray r(camera_center, ray_direction);
+            ray r(ray_origin, ray_direction);
             return r;
         }
 };

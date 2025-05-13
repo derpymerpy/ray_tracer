@@ -22,6 +22,8 @@ int main() {
     cam.samples_per_pixel = 50;
     cam.max_depth = 50;
     cam.vfov = 20;
+    cam.defocus_angle = 10.0;
+    cam.focus_distance = 3.4;
 
     if(!cam.set_camera_center(point3(-2, 2, 1), point3(0, 0, -1), vec3(0, 1, 0))){
          std::clog << "INVALID UP\n" << std::flush;
@@ -29,4 +31,5 @@ int main() {
     }
 
     cam.render(world);
+    std::clog<<cam.defocus_angle<<endl;
 }
