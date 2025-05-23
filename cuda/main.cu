@@ -32,22 +32,24 @@ __global__ void render(int *fb, int image_width, int image_height, point3 pixel0
     float a = ((float) 0.5) * (unit_direction.y() + (float) 1.0);
 
     color pixel_color = ((float) 1.0 - a)*color(1.0, 1.0, 1.0) + a * color(0.5, 0.7, 1.0);
-    write_color(fb, pixel_index, color(255,255,255));
+
+
+    write_color(fb, pixel_index, pixel_color);
 }
 
 int main() {
-    cout<<"output file: "<<endl;
+    cout<<"output file: ";
     string output_file;
     cin>>output_file;
     ofstream fout(output_file);
 
-    int image_width = 256;
-    int image_height = 256;
-
-    int num_pixels = image_height * image_width;
-    size_t fb_size = num_pixels * 3;
-
     //========camera stuff============
+    auto aspect_ratio = 16.0 / 9.0;
+    int image_width = 400;
+
+    // Calculate the image height, and ensure that it's at least 1.
+    int image_height = int(image_width / aspect_ratio);
+    image_height = (image_height < 1) ? 1 : image_height;
     auto focal_length = 1.0;
     auto viewport_height = 2.0;
     auto viewport_width = viewport_height * (double(image_width)/image_height);
@@ -67,8 +69,12 @@ int main() {
     auto pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
     //===============================
 
-    int* fb;
-    checkCudaErrors(cudaMallocManaged((void**)&fb, fb_size * sizeof(int)));
+
+    int num_pixels = image_height * image_width;
+    size_t fb_size = num_pixels * 3;
+    
+    int *fb;
+    checkCudaErrors(cudaMallocManaged((void**) &fb, fb_size * sizeof(int)));
     
     int tx = 32;
     int ty = 32;
