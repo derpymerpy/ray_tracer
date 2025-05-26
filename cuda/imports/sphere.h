@@ -1,31 +1,35 @@
 #ifndef SPHERE_H
 #define SPHERE_H
 
-
 #include "rtweekend.h"
 #include "hittable.h"
 #include "material.h"
 
 class sphere : public hittable{
     public: 
-        sphere(const point3& center, double radius, shared_ptr<material> mat)
-            : center(center), radius(std::fmax(0, radius)), mat(mat) {}
 
-        bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
+        //temporary. for testing chapter 4 port to cuda
+        __device__ sphere(const point3& center, float radius)
+            : center(center), radius(float_max(0, radius)) {}
+
+        __device__ sphere(const point3& center, float radius, material *mat)
+            : center(center), radius(float_max(0, radius)), mat(mat) {}
+
+        __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
             vec3 cq = center - r.origin();
-            double a = r.direction().length_squared();
-            double c = cq.length_squared() - radius*radius;
-            double h = dot(r.direction(), cq);
+            float a = r.direction().length_squared();
+            float c = cq.length_squared() - radius*radius;
+            float h = dot(r.direction(), cq);
 
-            double disc = h*h - a*c;
+            float disc = h*h - a*c;
             //no hits
             //std::cout<<a<<" "<<c<<" "<<h<<" "<<disc<<std::endl;
             if(disc < 0){
                 return false;
             }
 
-            double sqrt_disc = std::sqrt(disc);
-            double root = (h - sqrt_disc)/a;
+            float sqrt_disc = std::sqrt(disc);
+            float root = (h - sqrt_disc)/a;
             if(!ray_t.surrounds(root)){
                 root = (h+sqrt_disc)/a;
                 if(!ray_t.surrounds(root)) return false;
@@ -43,8 +47,8 @@ class sphere : public hittable{
 
     private: 
         point3 center;
-        double radius;
-        shared_ptr<material> mat;
+        float radius;
+        material* mat;
 };
 
 #endif

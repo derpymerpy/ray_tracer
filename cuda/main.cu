@@ -1,6 +1,9 @@
 #include <fstream>
-
 #include "imports/rtweekend.h"
+#include "imports/hittable.h"
+#include "imports/hittable_list.h"
+#include "imports/sphere.h"
+#include "imports/material.h"
 
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
@@ -14,6 +17,18 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
         // Make sure we call CUDA Device Reset before exiting
         cudaDeviceReset();
         exit(99);
+    }
+}
+
+__device__ vec3 tempColor(const ray& r, hittable **world) {
+    hit_record rec;
+    if ((*world)->hit(r, interval(0.0, __FLT_MAX__), rec)) { 
+        return 0.5f * (rec.norm + vec3(1.0, 1.0, 1.0));
+    }
+    else{
+        vec3 unit_direction = unit_vector(r.direction());
+        float t = 0.5f * (unit_direction.y() + 1.0f);
+        return (1.0f - t) * vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
     }
 }
 
@@ -35,6 +50,26 @@ __global__ void render(int *fb, int image_width, int image_height, point3 pixel0
 
 
     write_color(fb, pixel_index, pixel_color);
+}
+
+__global__ void initiate_world(hittable_list **d_world, hittable **d_list){
+    //only one block
+    int i = threadIdx.x;
+    int j = threadIdx.y;
+    if(i != 0 || j != 0) return; //ensure only run once
+    *(d_list+0) = new sphere(vec3(0,0,-1), 0.5);
+    *(d_list+1) = new sphere(vec3(0,-100.5,-1), 100);
+    *d_world = new hittable_list(d_list, 2);
+}
+
+__global__ void free_world(hittable_list **d_world, hittable **d_list){
+    //only one block
+    int i = threadIdx.x;
+    int j = threadIdx.y;
+    if(i != 0 || j != 0) return; //ensure only run once
+    delete *(d_list + 0);
+    delete *(d_list + 1);
+    delete *(d_world);
 }
 
 int main() {
@@ -79,8 +114,16 @@ int main() {
     int tx = 32;
     int ty = 32;
 
-    dim3 blocks(image_width/tx + 1, image_height/ty + 1); //round up 
+    dim3 blocks(image_width/tx + 1, image_height/ty + 1); 
     dim3 threads(tx, ty);
+
+    hittable **d_hittable_list;
+    int world_size = 2; //hardcode ground + sphere
+    checkCudaErrors(cudaMalloc((void**) &d_hittable_list, world_size * sizeof(hittable*))); //allocate memory for world 
+
+    hittable_list **d_world;
+    checkCudaErrors(cudaMalloc((void**) &d_world, 2*sizeof(hittable*)));
+    initiate_world<<<1, 1>>> (d_world, d_hittable_list);
 
     render<<<blocks, threads>>>(fb, image_width, image_height, pixel00_loc, pixel_delta_u, pixel_delta_v, camera_center);
     //wait for gpu to finish
@@ -95,5 +138,9 @@ int main() {
                 <<fb[pixel_index + 2] <<"\n"; 
         }
     }
+    free_world<<<1,1>>>(d_world, d_hittable_list);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaFree(d_hittable_list));
+    checkCudaErrors(cudaFree(d_world));
     checkCudaErrors(cudaFree(fb));
 }

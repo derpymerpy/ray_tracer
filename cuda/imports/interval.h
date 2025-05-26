@@ -5,8 +5,8 @@
 
 class interval{
     public: 
-        __device__ float min;
-        __device__ float max;
+        float min;
+        float max;
 
         __device__ interval(): min(+infinity), max(-infinity) {}
 

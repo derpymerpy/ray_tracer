@@ -29,6 +29,17 @@ inline float random_float(float min, float max) {
     return min + random_float() * (max-min);
 }
 
+__device__ inline float float_min(float x, float y){
+    if (x < y) return x;
+    return y;
+}
+
+__device__ inline float float_max(float x, float y){
+    if (x < y) return y;
+    return x;
+}
+
+
 
 #include "color.h"
 #include "interval.h"
