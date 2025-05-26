@@ -146,7 +146,7 @@ __host__ __device__ inline vec3 reflect(const vec3& v_in, const vec3& norm){
 
 __host__ __device__ inline vec3 refract(const vec3& v_in, const vec3& norm, float n_frac){
     //expects v_in and norm to be unit vectors
-    float cos = std::fmin(dot(-v_in, norm), 1.0);
+    float cos = float_min(dot(-v_in, norm), 1.0);
     vec3 r_perp = n_frac * (v_in + cos * norm);
     vec3 r_parallel = - sqrt(fabs(1.0 - r_perp.length_squared())) * norm;
     return r_perp + r_parallel;
