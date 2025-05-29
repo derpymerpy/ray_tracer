@@ -19,7 +19,7 @@ class ray {
         }
 
         //returns position of ray at time t
-        __device__ point3 at(double t) const{
+        __device__ point3 at(float t) const{
             return orig + t*dir;
         }
 

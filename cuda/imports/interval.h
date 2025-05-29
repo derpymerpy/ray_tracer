@@ -16,15 +16,15 @@ class interval{
             return max - min;
         }
 
-        __device__ bool contains(float d){
+        __device__ bool contains(float d) const {
             return min <= d && d <= max;
         }
         
-        __device__ bool surrounds(float d){
+        __device__ bool surrounds(float d) const {
             return min < d && d < max;
         }
 
-        __device__ float clamp(float d){
+        __device__ float clamp(float d) const {
             if (d < min) return min;
             if (d > max) return max;
             return d;

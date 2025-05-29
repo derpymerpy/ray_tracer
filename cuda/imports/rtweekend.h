@@ -5,6 +5,11 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <fstream>
+#include <curand_kernel.h>
+
+#define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
+
 
 using std::make_shared;
 using std::shared_ptr;
@@ -12,6 +17,15 @@ using std::shared_ptr;
 const float infinity = std::numeric_limits<float>::infinity();
 const float pi = 3.1415926535897932385;
 
+void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
+    if (result){
+        std::cerr << "CUDA error = " << static_cast<unsigned int>(result) << " at " 
+                  <<file << ":" << line << " '" << func << "' \n";
+        // Make sure we call CUDA Device Reset before exiting
+        cudaDeviceReset();
+        exit(99);
+    }
+}
 
 inline float degrees_to_radians(float degrees) {
     return degrees*pi/180;

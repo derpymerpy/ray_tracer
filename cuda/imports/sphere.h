@@ -9,11 +9,11 @@ class sphere : public hittable{
     public: 
 
         //temporary. for testing chapter 4 port to cuda
-        __device__ sphere(const point3& center, float radius)
-            : center(center), radius(float_max(0, radius)) {}
+        __device__ sphere(const point3& cen, float radius)
+            : center(cen), radius(radius), mat{nullptr} {}
 
         __device__ sphere(const point3& center, float radius, material *mat)
-            : center(center), radius(float_max(0, radius)), mat(mat) {}
+            : center(center), radius(float_max(0.0001f, radius)), mat(mat) {}
 
         __device__ bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
             vec3 cq = center - r.origin();
@@ -24,7 +24,7 @@ class sphere : public hittable{
             float disc = h*h - a*c;
             //no hits
             //std::cout<<a<<" "<<c<<" "<<h<<" "<<disc<<std::endl;
-            if(disc < 0){
+            if(disc < 0 || a < 1e-6f){
                 return false;
             }
 

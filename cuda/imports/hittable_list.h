@@ -20,7 +20,7 @@ class hittable_list : public hittable {
             double t_temp = ray_t.max;
 
             for (int i = 0; i<cnt; i++){
-                hittable *obj = *(objects+i);
+                hittable *obj = *(objects + i);
                 if(obj->hit(r, interval(ray_t.min, t_temp), rec_temp)){
                     has_hit = true;
                     t_temp = rec_temp.t;
