@@ -29,15 +29,17 @@ __global__ void initiate_world(hittable_list **d_world, hittable **d_list, mater
     //figure out a better way to configure this later
     *(mat+0) = new lambertian (color(0.8, 0.8, 0.0)); //ground material
     *(mat+1) = new lambertian (color(0.1, 0.2, 0.5)); //center
-    *(mat+2) = new metal (color(0.8, 0.8, 0.8), 0.3); //left
-    *(mat+3) = new metal (color(0.8, 0.6, 0.2), 1); //right
+    *(mat+2) = new dielectric (color(1, 1, 1), 1.5); //left
+    *(mat+3) = new dielectric (color(1, 1, 1), 1.0f/1.5f); //left bubble
+    *(mat+4) = new metal (color(0.8, 0.6, 0.2), 1); //right
     
     *(d_list+0) = new sphere(point3(0, -100.5, -1), 100, *(mat+0));
     *(d_list+1) = new sphere(point3(0, 0, -1.2), 0.5, *(mat+1));
     *(d_list+2) = new sphere(point3(-1.0, 0, -1), 0.5, *(mat+2));
-    *(d_list+3) = new sphere(point3(1.0, 0, -1), 0.5, *(mat+3));
+    *(d_list+3) = new sphere(point3(-1.0, 0, -1), 0.4, *(mat+3));
+    *(d_list+4) = new sphere(point3(1.0, 0, -1), 0.5, *(mat+4));
 
-    *d_world = new hittable_list(d_list, 4);  
+    *d_world = new hittable_list(d_list, 5);  
 }
 
 __global__ void free_world(hittable_list **d_world, hittable **d_list, material **mat){
@@ -106,7 +108,7 @@ __host__ void render(camera* h_cam, ostream& destination){
     h_cam->host_to_shared(d_cam);
 
     hittable **d_hittable_list;
-    int world_size = 4; //hardcoded ground + spheres
+    int world_size = 5; //hardcoded ground + spheres
     checkCudaErrors(cudaMalloc((void**) &d_hittable_list, world_size * sizeof(hittable*))); 
 
     hittable_list **d_world;
