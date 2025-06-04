@@ -35,12 +35,12 @@ inline float radians_to_degrees(float rad) {
     return rad*180/pi;
 }
 
-inline float random_float() {
-    return ((float) std::rand())/(RAND_MAX+1.0);
+__device__ inline float random_float(curandState *thread_state) {
+    return (curand_uniform(thread_state));
 }
 
-inline float random_float(float min, float max) {
-    return min + random_float() * (max-min);
+__device__ inline float random_float(float min, float max, curandState *local_state) {
+    return min + random_float(local_state) * (max-min);
 }
 
 __host__ __device__ inline float float_min(float x, float y){

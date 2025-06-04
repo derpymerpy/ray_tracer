@@ -31,6 +31,18 @@ class camera{
         int ty = 8;
 
 
+        __device__ vec3 temp_color(const ray& r, hittable_list **world) {
+            hit_record rec;
+            if ((*world)->hit(r, interval(0.0, __FLT_MAX__), rec)) { 
+                return 0.5f * (rec.norm + vec3(1.0, 1.0, 1.0));
+            }
+            else{
+                vec3 unit_direction = unit_vector(r.direction());
+                float t = 0.5f * (unit_direction.y() + 1.0f);
+                return (1.0f - t) * vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
+            }
+        }
+
         __host__ void initialize_camera() {
             image_height = (int) image_width/aspect_ratio;
             //set image_height to 1 if less than 1 
@@ -126,19 +138,91 @@ class camera{
             return pixel00_loc;
         }
 
-
-        __device__ vec3 temp_color(const ray& r, hittable_list **world) {
-            hit_record rec;
-            if ((*world)->hit(r, interval(0.0, __FLT_MAX__), rec)) { 
-                return 0.5f * (rec.norm + vec3(0, 0, 0));
-            }
-            else{
-                vec3 unit_direction = unit_vector(r.direction());
-                float t = 0.5f * (unit_direction.y() + 1.0f);
-                return (1.0f - t) * vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
-            }
+        __device__ vec3 pixel_sample_offset(float s, curandState *local_state) const{
+            return vec3(random_float(-s/2, s/2, local_state), random_float(-s/2, s/2, local_state), 0);
         }
-        
+
+        __device__ color ray_color(const ray& r, const hittable& world, curandState *local_state){
+
+            hit_record rec;
+
+            ray cur_ray = r;
+            color total_attentuation = color(1.0, 1.0, 1.0);
+            for(int i = 0; i < samples_per_pixel; i++){
+                bool hit_any = world.hit(cur_ray, interval(0.001, infinity), rec);
+                //check for hits
+                if(hit_any){
+                    color attentuation = color(1, 1, 1);
+                    if(rec.mat -> scatter(cur_ray, rec, attentuation, cur_ray, local_state)){
+                        total_attentuation = total_attentuation * attentuation;
+                    }
+                    else{
+                        return color(0, 0, 0);
+                    }
+                }
+                //no hits -> background
+                else{
+                    vec3 unit_direction = unit_vector(r.direction());
+                    //ranges between 0.0-1.0
+                    auto a = 0.5 * (unit_direction.y() + 1.0);
+                    return total_attentuation * ((1.0-a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7, 1.0));
+                }
+            }
+            return color(1, 0, 0);
+        }
+
+        __device__ ray get_sample_ray(point3 pixel_center, float s, curandState *local_state) const {
+            vec3 offset = pixel_sample_offset(s, local_state);
+            point3 ray_origin = defocus_disk_offset(local_state);
+            // point3 target_pixel = pixel_center;
+            //offset for antialiasing
+            vec3 ray_direction = pixel_center 
+                                 + offset.x() * d_u 
+                                 + offset.y() * d_v
+                                 - ray_origin;
+            ray r(ray_origin, ray_direction);
+            return r;
+        }
+
+        __host__ void host_to_shared(camera *dest) const{
+            dest->aspect_ratio = aspect_ratio;
+            dest->image_width = image_width;
+
+            dest->samples_per_pixel = samples_per_pixel;
+            dest->max_depth = max_depth;
+
+            dest->defocus_angle = defocus_angle; //angle at apex of defocus cone. controls radius of defocus disk
+            dest->focus_distance = focus_distance; //distance from camera center to focus plane
+
+            //vertical field of view
+            dest->vfov = vfov;
+
+            // cuda thread dimensions 
+            dest->tx = tx;
+            dest->ty = ty;
+
+            dest->image_height = image_height;
+            dest->num_pixels = num_pixels;
+            dest->fb_size = fb_size;
+
+            dest->camera_center = camera_center;
+
+            //vectors to move between pixels
+            dest->d_u = d_u;
+            dest->d_v = d_v;
+
+            //unit direction vectors 
+            dest->unit_u = unit_u;
+            dest->unit_v = unit_v;
+            dest->unit_w = unit_w;
+
+            //first pixel
+            dest->pixel00_loc = pixel00_loc;
+
+            dest->defocus_disk_u = defocus_disk_u;
+            dest->defocus_disk_v = defocus_disk_v;
+        }
+
     private: 
         int image_height;
         int num_pixels;
@@ -161,52 +245,18 @@ class camera{
         vec3 defocus_disk_u;
         vec3 defocus_disk_v;
 
-        __device__ color ray_color(const ray& r, const hittable& world, int depth){
-            if (depth < 0) return color(0, 0, 0);
 
-            hit_record rec;
-            //check for hits
-            bool hit_any = world.hit(r, interval(0.001, infinity), rec);
-            if(hit_any){
-                ray scattered;
-                color attentuation;
-                if(rec.mat -> scatter(r, rec, attentuation, scattered)){
-                    return attentuation * ray_color(scattered, world, depth-1);
-                }
-                return color(0, 0, 0);
-            }
-            
-            //background
-            vec3 unit_direction = unit_vector(r.direction());
-            //ranges between 0.0-1.0
-            auto a = 0.5 * (unit_direction.y() + 1.0);
-            return (1.0-a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7, 1.0);
-        }
-
-        __device__ vec3 pixel_sample_offset(float s) const{
-            return vec3(random_float(-s/2, s/2), random_float(-s/2, s/2), 0);
-        }
-
-        __device__ vec3 defocus_disk_offset() const{
+        __device__ vec3 defocus_disk_offset(curandState *local_state) const{
+            //temporarily not used
+            return camera_center;
             if (defocus_angle > 0){
-                vec3 offset = random_in_unit_disk();    
+                vec3 offset = random_in_unit_disk(local_state);    
                 //use u, v as unit direction vectors
                 return camera_center + (offset.x() * defocus_disk_u) + (offset.y() * defocus_disk_v);
             }
             return camera_center;
         }
 
-        __device__ ray get_sample_ray(point3 pixel_center, float s) const {
-            vec3 offset = pixel_sample_offset(s);
-            point3 ray_origin = defocus_disk_offset();
-            //offset for antialiasing
-            vec3 ray_direction = pixel_center 
-                                 + offset.x() * d_u 
-                                 + offset.y() * d_v
-                                 - ray_origin;
-            ray r(ray_origin, ray_direction);
-            return r;
-        }
 };
 
 #endif

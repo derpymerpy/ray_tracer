@@ -8,10 +8,6 @@
 class sphere : public hittable{
     public: 
 
-        //temporary. for testing chapter 4 port to cuda
-        __device__ sphere(const point3& cen, float radius)
-            : center(cen), radius(radius), mat{nullptr} {}
-
         __device__ sphere(const point3& center, float radius, material *mat)
             : center(center), radius(float_max(0.0001f, radius)), mat(mat) {}
 

@@ -7,10 +7,8 @@
 
 class material {
     public: 
-        __device__ virtual ~material() = default;
-
         __device__ virtual bool scatter(const ray& r_in, const hit_record& rec, 
-                             color& attentuation, ray& scattered) const {
+                             color& attentuation, ray& scattered, curandState *local_state) const {
             return false;
         }
     protected: 
@@ -24,8 +22,9 @@ class lambertian : public material {
         }
         
         __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, 
-                     ray& scattered) const override {
-            vec3 direction = rec.norm + random_unit_vec();
+                     ray& scattered, curandState *local_state) const override {
+            vec3 direction = rec.norm + random_unit_vec(local_state);
+            // vec3 direction = rec.norm;
             if(direction.near_zero()) direction = rec.norm;
             
             scattered = ray(rec.p, direction);
@@ -37,13 +36,14 @@ class lambertian : public material {
 
 class metal : public material {
     public: 
-        __device__ metal(const color& albedo, float fuzz): fuzz(fuzz < 1 ? fuzz : 1) {
+        __device__ metal(const color& albedo, float fuzz): fuzz(fuzz < 1 ? fuzz : 1){
             this -> albedo = albedo;
         }
 
         __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, 
-                     ray& scattered) const override {
-            vec3 reflection = reflect(r_in.direction(), rec.norm) + fuzz*random_unit_vec(); 
+                     ray& scattered, curandState *local_state) const override {
+            vec3 reflection = reflect(r_in.direction(), rec.norm);
+            reflection = unit_vector(reflection) + fuzz*random_unit_vec(local_state); 
             scattered = ray(rec.p, reflection);
             attenuation = albedo;
             return (dot(scattered.direction(), rec.norm) > 0);
@@ -60,7 +60,7 @@ class dielectric : public material {
         }
 
         __device__ bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, 
-                     ray& scattered) const override {
+                     ray& scattered, curandState *local_state) const override {
             attenuation = albedo;
 
             float ri = refractive_index;
@@ -72,7 +72,7 @@ class dielectric : public material {
             float sin_theta = std::sqrt(1.0 - cos_theta*cos_theta);
 
             vec3 result;
-            if(ri * sin_theta > 1.0 || reflectance(cos_theta, refractive_index) > random_float()){
+            if(ri * sin_theta > 1.0 || reflectance(cos_theta, refractive_index) > random_float(local_state)){
                 result = reflect(r_in.direction(), rec.norm);
             }
             else{

@@ -22,7 +22,7 @@ int main() {
     camera cam;
     cam.aspect_ratio = 16.0/9.0;
     cam.image_width = 400;
-    cam.samples_per_pixel = 100;
+    cam.samples_per_pixel = 50;
     cam.max_depth = 50;
     
     cam.vfov = 90;
@@ -34,7 +34,6 @@ int main() {
          return -1;
     }
 
-    cam.initialize_camera();
     //null is TEMPORARY. currently not being used
-    render(nullptr, &cam, fout);
+    render(&cam, fout);
 }

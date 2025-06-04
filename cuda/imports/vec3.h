@@ -51,7 +51,7 @@ class vec3 {
             return std::sqrt(length_squared());
         }
 
-        __host__ __device__ bool near_zero() const{
+        __device__ bool near_zero() const{
             auto s = 1e-18;
             return (std::fabs(e[0]) < s) && (std::fabs(e[1]) < s) && (std::fabs(e[2]) < s);
         }
@@ -104,17 +104,17 @@ __host__ __device__ inline vec3 unit_vector(const vec3& v){
     return v/ (v.length());
 }
 
-__host__ __device__ static vec3 random_vec(){
-    return vec3(random_float(), random_float(), random_float());
+__device__ static vec3 random_vec(curandState *local_state){
+    return vec3(random_float(local_state), random_float(local_state), random_float(local_state));
 }
 
-__host__ __device__ static vec3 random_vec(float min, float max){
-    return vec3(random_float(min, max), random_float(min, max), random_float(min, max));
+__device__ static vec3 random_vec(float min, float max, curandState *local_state){
+    return vec3(random_float(min, max, local_state), random_float(min, max, local_state), random_float(min, max, local_state));
 }
 
-__host__ __device__ inline vec3 random_in_unit_disk(){
+__device__ inline vec3 random_in_unit_disk(curandState *local_state){
     while (true){
-        vec3 v = vec3(random_float(-1, 1), random_float(-1, 1), 0.0);
+        vec3 v = vec3(random_float(-1, 1, local_state), random_float(-1, 1, local_state), 0.0);
         if(v.length_squared() < 1){
             return v;
         }
@@ -122,9 +122,9 @@ __host__ __device__ inline vec3 random_in_unit_disk(){
 }
 
 
-__host__ __device__ inline vec3 random_unit_vec(){
+__device__ inline vec3 random_unit_vec(curandState *local_state){
     while (true) {
-        auto p = random_vec(-1.0, 1.0);
+        auto p = random_vec(-1.0, 1.0, local_state);
         float l = p.length_squared();
         //reject vectors outside sphere to ensure uniform distribution
         if (1e-60 < l && l <= 1){
@@ -133,18 +133,18 @@ __host__ __device__ inline vec3 random_unit_vec(){
     }
 }
 
-__host__ __device__ inline vec3 random_on_hemisphere(const vec3& norm){
-    vec3 v = random_unit_vec();
+__device__ inline vec3 random_on_hemisphere(const vec3& norm, curandState *local_state){
+    vec3 v = random_unit_vec(local_state);
     if (dot(v, norm) > 0) return v;
     return -v;
 }
 
-__host__ __device__ inline vec3 reflect(const vec3& v_in, const vec3& norm){
+__device__ inline vec3 reflect(const vec3& v_in, const vec3& norm){
     //negative since the dot product already flips the sign 
     return v_in - 2*norm*dot(v_in, norm);
 }
 
-__host__ __device__ inline vec3 refract(const vec3& v_in, const vec3& norm, float n_frac){
+__device__ inline vec3 refract(const vec3& v_in, const vec3& norm, float n_frac){
     //expects v_in and norm to be unit vectors
     float cos = float_min(dot(-v_in, norm), 1.0);
     vec3 r_perp = n_frac * (v_in + cos * norm);
