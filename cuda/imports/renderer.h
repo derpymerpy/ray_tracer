@@ -20,45 +20,79 @@ __global__ void initiate_randstate(int image_width, int image_height, curandStat
 }
 
 
-__global__ void initiate_world(hittable_list **d_world, hittable **d_list, material **mat){
+__global__ void initiate_world(hittable_list **d_world, hittable **d_list, material **mat_list, curandState* d_rand_state){
     //only one block
     int i = threadIdx.x;
     int j = threadIdx.y;
     if(i != 0 || j != 0) return; //ensure only run once
 
-    //figure out a better way to configure this later
-    *(mat+0) = new lambertian (color(0.8, 0.8, 0.0)); //ground material
-    *(mat+1) = new lambertian (color(0.1, 0.2, 0.5)); //center
-    *(mat+2) = new dielectric (color(1, 1, 1), 1.5); //left
-    *(mat+3) = new dielectric (color(1, 1, 1), 1.0f/1.5f); //left bubble
-    *(mat+4) = new metal (color(0.8, 0.6, 0.2), 1); //right
-    
-    *(d_list+0) = new sphere(point3(0, -100.5, -1), 100, *(mat+0));
-    *(d_list+1) = new sphere(point3(0, 0, -1.2), 0.5, *(mat+1));
-    *(d_list+2) = new sphere(point3(-1.0, 0, -1), 0.5, *(mat+2));
-    *(d_list+3) = new sphere(point3(-1.0, 0, -1), 0.4, *(mat+3));
-    *(d_list+4) = new sphere(point3(1.0, 0, -1), 0.5, *(mat+4));
+    //ground
+    *(mat_list+0) = new lambertian(color(0.5f, 0.5f, 0.5f));
+    *(d_list + 0) = new sphere(point3(0.0f, -1000.0f, 0.0f), 1000.0f, *(mat_list+0));
 
-    *d_world = new hittable_list(d_list, 5);  
+    *(mat_list+1) = new dielectric(color(1.0f, 1.0f, 1.0f), 1.5f);
+    *(d_list + 1) = new sphere(point3(0.0f, 1.0f, 0.0f), 1.0f, *(mat_list+1));
+
+    *(mat_list+2) = new lambertian(color(0.4f, 0.2f, 0.1f));
+    *(d_list + 2) = new sphere(point3(-4.0f, 1.0f, 0.0f), 1.0f, *(mat_list+2));
+
+    *(mat_list+3) = new metal(color(0.7f, 0.6f, 0.5f), 0.0);
+    *(d_list + 3) = new sphere(point3(4.0f, 1.0f, 0.0f), 1.0f, *(mat_list+3));
+
+    curandState local_rand_state = d_rand_state[0];
+
+    for (int a = -11; a < 11; a++) {
+        for (int b = -11; b < 11; b++) {
+            
+            int obj_index = 22*(a+11) + b + 11 + 4;
+
+            float choose_mat = random_float(&local_rand_state);
+            point3 center(a + 0.9f*random_float(&local_rand_state), 0.2f, b + 0.9f*random_float(&local_rand_state));
+
+            while ((center - point3(4.0f, 0.2f, 0.0f)).length() <= 0.9f){
+                center = point3(a + 0.9f*random_float(&local_rand_state), 0.2f, b + 0.9f*random_float(&local_rand_state));
+            }
+
+            if (choose_mat < 0.8f) {
+                // diffuse
+                auto albedo = random_vec(0, 1, &local_rand_state) * random_vec(0, 1, &local_rand_state);
+                *(mat_list + obj_index) = new lambertian(albedo);
+                *(d_list + obj_index) = new sphere(center, 0.2, *(mat_list + obj_index));
+            } 
+            else if (choose_mat < 0.95f) {
+                // metal
+                auto albedo = random_vec(0.5, 1, &local_rand_state);
+                auto fuzz = random_float(0, 0.5, &local_rand_state);
+                *(mat_list + obj_index) = new metal(albedo, fuzz);
+                *(d_list + obj_index) = new sphere(center, 0.2, *(mat_list + obj_index));
+            } 
+            else {
+                // glass
+                *(mat_list + obj_index) = new dielectric(color(1, 1, 1), 1.5);
+                *(d_list + obj_index) = new sphere(center, 0.2, *(mat_list + obj_index));
+            }
+        }
+    }
+
+
+    *d_world = new hittable_list(d_list, 22 * 22 + 4);  
 }
 
-__global__ void free_world(hittable_list **d_world, hittable **d_list, material **mat){
+__global__ void free_world(hittable_list **d_world, int world_size, hittable **d_list, material **mat_list, int mat_cnt){
     //only one block
     int i = threadIdx.x;
     int j = threadIdx.y;
     if(i != 0 || j != 0) return; //ensure only run once
 
-    delete *(d_list + 0);
-    delete *(d_list + 1);
-    delete *(d_list + 2);
-    delete *(d_list + 3);
+    for (int i = 0; i < world_size; i++){
+        delete(*(d_list+i));
+    }
 
     delete *(d_world);
     
-    delete *(mat+0);
-    delete *(mat+1);
-    delete *(mat+2);
-    delete *(mat+3);
+    for (int i =0; i < mat_cnt; i++){
+        delete(*(mat_list+i));
+    }
 }
 
 
@@ -72,7 +106,7 @@ __global__ void render_world(int *fb, camera *cam, hittable_list **d_world, cura
 
     curandState local_rand_state = d_rand_state[pixel_index];
 
-    color pixel_color = color(0, 0, 0);
+    color pixel_color = color(0.0f, 0.0f, 0.0f);
     
     for(int sample = 0; sample < num_samples; sample++){
         point3 pixel_center = cam->get_pixel00_loc() + i*cam->get_du() + j*cam->get_dv();
@@ -93,6 +127,9 @@ __host__ void render(camera* h_cam, ostream& destination){
     //block dimensions
     dim3 blocks((h_cam->image_w())/(h_cam->tx) + 1, (h_cam->image_h())/(h_cam->ty) + 1); 
     dim3 threads(h_cam->tx, h_cam->ty);
+    
+    int world_size = 22 * 22 + 4;
+    int mat_cnt = 22 * 22 + 4;
 
     //frame buffer to store pixel values
     int *fb;
@@ -108,18 +145,20 @@ __host__ void render(camera* h_cam, ostream& destination){
     h_cam->host_to_shared(d_cam);
 
     hittable **d_hittable_list;
-    int world_size = 5; //hardcoded ground + spheres
     checkCudaErrors(cudaMalloc((void**) &d_hittable_list, world_size * sizeof(hittable*))); 
 
     hittable_list **d_world;
     checkCudaErrors(cudaMalloc((void**) &d_world, sizeof(hittable_list*)));
 
     material **mat;
-    checkCudaErrors(cudaMalloc((void**) &mat, 4*sizeof(material*)));
-    initiate_world<<<1, 1>>> (d_world, d_hittable_list, mat);
-    clog<<"world initiated\n"<<flush;
+    checkCudaErrors(cudaMalloc((void**) &mat, mat_cnt*sizeof(material*)));
+
     initiate_randstate<<<blocks, threads>>> (h_cam->image_w(), h_cam->image_h(), d_rand_state);
     clog<<"randstate initiated\n"<<flush;
+
+    initiate_world<<<1, 1>>> (d_world, d_hittable_list, mat, d_rand_state);
+    clog<<"world initiated\n"<<flush;
+        
     render_world<<<blocks, threads>>>(fb, d_cam, d_world, d_rand_state, h_cam->samples_per_pixel);
     
     checkCudaErrors(cudaDeviceSynchronize());
@@ -143,11 +182,13 @@ __host__ void render(camera* h_cam, ostream& destination){
     }
 
     cout<<"missing pixels: "<< printed.size()<<endl;
-    free_world<<<1,1>>>(d_world, d_hittable_list, mat);
+    free_world<<<1,1>>>(d_world, world_size, d_hittable_list, mat, mat_cnt);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaFree(d_hittable_list));
     checkCudaErrors(cudaFree(d_world));
     checkCudaErrors(cudaFree(d_cam));
     checkCudaErrors(cudaFree(fb));
+    checkCudaErrors(cudaFree(d_rand_state));
+    checkCudaErrors(cudaFree(mat));
 }
 #endif

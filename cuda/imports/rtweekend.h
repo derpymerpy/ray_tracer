@@ -11,11 +11,9 @@
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 
 
-using std::make_shared;
-using std::shared_ptr;
 
 const float infinity = std::numeric_limits<float>::infinity();
-const float pi = 3.1415926535897932385;
+const float pi = 3.1415926535897932385f;
 
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
     if (result){
@@ -28,11 +26,11 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 }
 
 inline float degrees_to_radians(float degrees) {
-    return degrees*pi/180;
+    return degrees*pi/180.0f;
 }
 
 inline float radians_to_degrees(float rad) {
-    return rad*180/pi;
+    return rad*180.0f/pi;
 }
 
 __device__ inline float random_float(curandState *thread_state) {

@@ -52,7 +52,7 @@ class vec3 {
         }
 
         __device__ bool near_zero() const{
-            auto s = 1e-18;
+            float s = 1e-18f;
             return (std::fabs(e[0]) < s) && (std::fabs(e[1]) < s) && (std::fabs(e[2]) < s);
         }
 };
@@ -114,7 +114,7 @@ __device__ static vec3 random_vec(float min, float max, curandState *local_state
 
 __device__ inline vec3 random_in_unit_disk(curandState *local_state){
     while (true){
-        vec3 v = vec3(random_float(-1, 1, local_state), random_float(-1, 1, local_state), 0.0);
+        vec3 v = vec3(random_float(-1, 1, local_state), random_float(-1, 1, local_state), 0.0f);
         if(v.length_squared() < 1){
             return v;
         }
@@ -124,10 +124,10 @@ __device__ inline vec3 random_in_unit_disk(curandState *local_state){
 
 __device__ inline vec3 random_unit_vec(curandState *local_state){
     while (true) {
-        auto p = random_vec(-1.0, 1.0, local_state);
+        auto p = random_vec(-1.0f, 1.0f, local_state);
         float l = p.length_squared();
         //reject vectors outside sphere to ensure uniform distribution
-        if (1e-60 < l && l <= 1){
+        if (__FLT_MIN__ < l && l <= 1){
             return p/sqrt(l);
         }
     }
@@ -146,7 +146,7 @@ __device__ inline vec3 reflect(const vec3& v_in, const vec3& norm){
 
 __device__ inline vec3 refract(const vec3& v_in, const vec3& norm, float n_frac){
     //expects v_in and norm to be unit vectors
-    float cos = float_min(dot(-v_in, norm), 1.0);
+    float cos = float_min(dot(-v_in, norm), 1.0f);
     vec3 r_perp = n_frac * (v_in + cos * norm);
     vec3 r_parallel = - sqrt(fabs(1.0 - r_perp.length_squared())) * norm;
     return r_perp + r_parallel;

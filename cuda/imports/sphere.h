@@ -19,12 +19,11 @@ class sphere : public hittable{
 
             float disc = h*h - a*c;
             //no hits
-            //std::cout<<a<<" "<<c<<" "<<h<<" "<<disc<<std::endl;
             if(disc < 0 || a < 1e-6f){
                 return false;
             }
 
-            float sqrt_disc = std::sqrt(disc);
+            float sqrt_disc = sqrtf(disc);
             float root = (h - sqrt_disc)/a;
             if(!ray_t.surrounds(root)){
                 root = (h+sqrt_disc)/a;

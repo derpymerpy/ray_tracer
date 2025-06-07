@@ -20,16 +20,16 @@ int main() {
     //CAMERA 
     //h_cam
     camera cam;
-    cam.aspect_ratio = 16.0/9.0;
-    cam.image_width = 400;
-    cam.samples_per_pixel = 50;
+    cam.aspect_ratio = 16.0f/9.0f;
+    cam.image_width = 1920;
+    cam.samples_per_pixel = 500;
     cam.max_depth = 50;
     
     cam.vfov = 20;
-    // cam.defocus_angle = 10.0;
-    // cam.focus_distance = 3.4;
+    cam.defocus_angle = 0.6f;
+    cam.focus_distance = 10.0f;
 
-    if(!cam.set_camera_center(point3(-2, 2, 1), point3(0, 0, -1), vec3(0, 1, 0))){
+    if(!cam.set_camera_center(point3(13, 2, 3), point3(0, 0, 0), vec3(0, 1, 0))){
          std::clog << "INVALID UP\n" << std::flush;
          return -1;
     }

@@ -65,14 +65,14 @@ class dielectric : public material {
 
             float ri = refractive_index;
             //reciprocal if the ray is going the other way
-            if(rec.front_face) ri = 1.0/refractive_index;
+            if(rec.front_face) ri = 1.0f/refractive_index;
         
             vec3 unit_direction = unit_vector(r_in.direction());
             float cos_theta = float_min(dot(-unit_direction, rec.norm), 1.0f);
-            float sin_theta = std::sqrt(1.0 - cos_theta*cos_theta);
+            float sin_theta = sqrtf(1.0f - cos_theta*cos_theta);
 
             vec3 result;
-            if(ri * sin_theta > 1.0 || reflectance(cos_theta, refractive_index) > random_float(local_state)){
+            if(ri * sin_theta > 1.0f || reflectance(cos_theta, refractive_index) > random_float(local_state)){
                 result = reflect(r_in.direction(), rec.norm);
             }
             else{
@@ -89,7 +89,7 @@ class dielectric : public material {
         __device__ static float reflectance(float cos, float reflective_index) {
             auto r0 = (1 - reflective_index)/(1 + reflective_index);
             r0 = r0 * r0;
-            return r0 + (1-r0) * std::pow(1-cos, 5);
+            return r0 + (1-r0) * powf(1-cos, 5);
         }
 };
 
